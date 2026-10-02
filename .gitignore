@@ -1,0 +1,6 @@
+build/
+re/out/
+.pio/
+__pycache__/
+*.pyc
+*.exe
