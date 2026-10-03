@@ -214,6 +214,7 @@ Nothing above about 5960 MHz is usable.
 | FPVGate's RSSI jumps randomly and ignores the VTX | The filter is missing, or GPIO10 isn't working | Fit the filter. Check the C5 printed `analog out: GPIO10 running`. |
 | The C5 doesn't follow FPVGate's channel | Bus wiring | Type `bus`. `frames=0` means nothing is arriving. Idle should show `SEL=...(1) CLK=...(0)`; if they're the other way round, SEL and CLK are swapped. |
 | RSSI is stuck at 255 | The top of the calibration is too low | Raise it with `cal <lo> <hi>` |
+| FPVGate reads about 241 and ignores `out 0` / `out 255` | The sigma-delta clock is off (older firmware, after a USB reset) | Update the firmware, which fixes it automatically, or power-cycle the C5. `bus` shows `RSSI=GPIO10 high 100%` when it's stuck. |
 | The background jumps about with the VTX off | Wi-Fi or other 5 GHz traffic on that channel | With the VTX off, type `cal lo` to raise the bottom of the scale |
 | FPVGate shows one channel but the RSSI ignores the VTX | The C5 restarted and went back to its boot frequency. FPVGate only sends a channel when it changes, so it doesn't know. | `s` shows the C5's frequency. In FPVGate, select another channel and then yours again. |
 | The RSSI rises in two steps when the VTX powers up | The VTX starts at low power, then switches to full power | That's the VTX, not the C5. `knee -55 6` makes it less visible. |

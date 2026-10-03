@@ -131,6 +131,14 @@ voltage. An RC filter turns that into a steady level. With the recommended
 10k/10k divider, RSSI 255 is about 1.5 V, just under FPVGate's ADC limit. See
 [HARDWARE.md](HARDWARE.md).
 
+The sigma-delta's clock gate (`SDM.misc.sigmadelta_clk_en`) was sometimes
+found off after start-up, typically after a USB reset, even though the driver
+had turned it on. With no clock the output freezes, usually high, and FPVGate
+reads about 241 whatever the signal. Only a power cycle cleared it. The
+firmware now checks the gate on every output update and turns it back on.
+`bus` shows how often that has happened, and how often GPIO10 actually reads
+high.
+
 **Digital.** Registers 0x6 and 0x7 (see the table above). A host can check the
 0xC5 signature and read the RSSI directly. FPVGate doesn't use this today.
 

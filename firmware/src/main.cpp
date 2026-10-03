@@ -15,6 +15,9 @@
 #include "driver/sdm.h"
 #include "hal/gpio_ll.h"
 #include "soc/gpio_struct.h"
+#include "soc/gpio_ext_struct.h"   // SDM
+#include "soc/pcr_struct.h"        // PCR, for the bus register dump
+#include "hal/sdm_ll.h"
 
 #include "board_pins.h"
 #include "core/rx5808_bus.h"
@@ -48,6 +51,7 @@ static PersistConfig  g_cfg;          // the live settings, changed by the conso
 static sdm_channel_handle_t g_sdm = nullptr;
 static esp_err_t      g_sdmErr = ESP_FAIL;
 static int            g_outOverride = -1;   // `out` command: fixed RSSI, or -1
+static uint32_t       g_sdmClockFixes = 0;  // times the sigma-delta clock was found off
 
 // Register values for the host to read. loop() keeps them up to date, so the
 // interrupt handler never has to touch the controller.
@@ -206,16 +210,33 @@ static int consoleForceOutput(void* /*ctx*/, int counts) {
 static void consoleBusInfo(void* /*ctx*/, char* out, int len) {
     Rx5808Word pw = parseWord(g_busLastWord);
     uint16_t mhz = (pw.address == REG_SYNTH_RF) ? synthRegToMhz((uint16_t)(pw.data & 0xFFFF)) : 0;
+    // How often the RSSI pad itself reads high: about the sigma-delta's duty
+    // if the C5 is driving it, stuck at 0 or 100% if something else is.
+    gpio_ll_input_enable(&GPIO, PIN_RSSI_SDM);
+    int highs = 0;
+    for (int i = 0; i < 4000; ++i) highs += pinLevel(PIN_RSSI_SDM);
     snprintf(out, len,
              "bus: frames=%lu writes=%lu reads=%lu short=%lu (last short: %u bits)\n"
              "     last write: addr=0x%X data=0x%05lX%s%u%s  last read addr=0x%X\n"
-             "     pins SEL=GPIO%d(%d) CLK=GPIO%d(%d) DATA=GPIO%d(%d)\n",
+             "     pins SEL=GPIO%d(%d) CLK=GPIO%d(%d) DATA=GPIO%d(%d) RSSI=GPIO%d high %d.%d%%\n",
              (unsigned long)g_busFrames, (unsigned long)g_busWrites,
              (unsigned long)g_busReads, (unsigned long)g_busShort, g_busShortBits,
              pw.address, (unsigned long)pw.data, mhz ? " = " : "", mhz, mhz ? " MHz" : "",
              g_busLastReadAddr,
              PIN_RX5808_SEL, pinLevel(PIN_RX5808_SEL), PIN_RX5808_CLK, pinLevel(PIN_RX5808_CLK),
-             PIN_RX5808_DATA, pinLevel(PIN_RX5808_DATA));
+             PIN_RX5808_DATA, pinLevel(PIN_RX5808_DATA),
+             PIN_RSSI_SDM, highs / 40, (highs % 40) / 4);
+    int used = (int)strlen(out);
+    snprintf(out + used, len - used,
+             "     sdm clock found off and restarted %lu times\n"
+             "     regs: iomux_clk_conf=0x%08lX iomux_conf=0x%08lX sdm_misc=0x%08lX\n"
+             "           sdm ch0..3=0x%08lX 0x%08lX 0x%08lX 0x%08lX out_sel[%d]=0x%08lX enable=0x%08lX\n",
+             (unsigned long)g_sdmClockFixes,
+             (unsigned long)PCR.iomux_clk_conf.val, (unsigned long)PCR.iomux_conf.val,
+             (unsigned long)SDM.misc.val, (unsigned long)SDM.channel[0].val,
+             (unsigned long)SDM.channel[1].val, (unsigned long)SDM.channel[2].val,
+             (unsigned long)SDM.channel[3].val, PIN_RSSI_SDM,
+             (unsigned long)GPIO.func_out_sel_cfg[PIN_RSSI_SDM].val, (unsigned long)GPIO.enable.val);
 }
 
 // ---- analog RSSI output ----
@@ -230,6 +251,14 @@ static void setupSdm() {
 }
 
 static void updateAnalogOut(uint8_t counts) {
+    // The sigma-delta's clock gate sometimes ends up off after start-up
+    // (seen after USB resets; something clears it after sdm_channel_enable).
+    // With no clock the output freezes, often high, and FPVGate reads about
+    // 241 whatever the RSSI is. Put it back and count it for `bus`.
+    if (g_sdm && g_sdmErr == ESP_OK && !SDM.misc.sigmadelta_clk_en) {
+        sdm_ll_enable_clock(&SDM, true);
+        ++g_sdmClockFixes;
+    }
     if (g_outOverride >= 0) counts = (uint8_t)g_outOverride;
     if (g_sdm && g_sdmErr == ESP_OK)
         sdm_channel_set_pulse_density(g_sdm, g_codec.densityForCounts(counts));

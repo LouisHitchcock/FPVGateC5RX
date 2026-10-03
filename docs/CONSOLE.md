@@ -64,7 +64,7 @@ The 30 ms peak-hold that removes the C5's regular dips is always on.
 
 | Command | What it does |
 |---|---|
-| `bus` | What has arrived from FPVGate: frames, writes, reads, any frames that ended early, the last command and the frequency it works out to, plus the current SEL, CLK and DATA levels |
+| `bus` | What has arrived from FPVGate: frames, writes, reads, any frames that ended early, the last command and the frequency it works out to, plus the current SEL, CLK and DATA levels. Also the RSSI pin: how often GPIO10 reads high (about the output level, so `out 0` gives 0%), how often the sigma-delta clock has been found off and restarted, and the raw clock and routing registers. |
 
 With FPVGate idle, it should show `SEL=...(1) CLK=...(0)`. When FPVGate tunes
 the C5, the console also prints `host: tune <MHz> ...`.

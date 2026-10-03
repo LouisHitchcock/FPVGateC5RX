@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp32-hal.h"   // temperatureRead()
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -231,7 +232,7 @@ void C5RadioBackend::diag(char* out, int len) const {
              "  last channel set: %u (%s), driver reports channel %u\n"
              "  method=%s, this channel tuned by %s, 11p=%s hold=%d\n"
              "  phy freq=%u MHz, retuned behind us %lu times (last to %u MHz, %lu ms ago), reasserted %lu\n"
-             "  live rssi=%d dBm, sigrssi=%d, noise floor/4=%d\n",
+             "  live rssi=%d dBm, sigrssi=%d, noise floor/4=%d, chip %.1f C\n",
              inited_, powered_, tuned_,
              esp_err_to_name(errInit_), esp_err_to_name(errCountry_),
              esp_err_to_name(errStart_), esp_err_to_name(errBand_),
@@ -241,7 +242,7 @@ void C5RadioBackend::diag(char* out, int len) const {
              (unsigned long)(lastDriftMs_ ? lastPollMs_ - lastDriftMs_ : 0),
              (unsigned long)reasserts_,
              inited_ ? phy_get_rssi() : 0, inited_ ? phy_get_sigrssi() : 0,
-             inited_ ? (phy_get_noise_floor() >> 2) : 0);
+             inited_ ? (phy_get_noise_floor() >> 2) : 0, temperatureRead());
 }
 
 const char* C5RadioBackend::methodName() const {
