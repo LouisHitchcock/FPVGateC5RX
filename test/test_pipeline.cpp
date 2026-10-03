@@ -9,7 +9,7 @@ static void test_calibration_map() {
     RssiPipeline p;
     RssiPipelineConfig c;
     c.dbLo = -95; c.dbHi = -35; c.emaAlpha = 1.0f; c.useMedian3 = false;
-    c.settleMs = 0; c.windowMaxMs = 0;   // isolate the calibration map
+    c.settleMs = 0; c.windowMaxMs = 0; c.preMin = 1;   // isolate the calibration map
     p.begin(c);
     // With no smoothing, the output follows the input straight away.
     p.onSample(-95, 10); CHECK_EQ(p.counts(), 0);
@@ -58,7 +58,7 @@ static void test_window_removes_dips() {
     RssiPipeline p;
     RssiPipelineConfig c;
     c.dbLo = -90; c.dbHi = -20; c.emaAlpha = 1.0f; c.useMedian3 = false;
-    c.settleMs = 0; c.windowMaxMs = 30;
+    c.settleMs = 0; c.windowMaxMs = 30; c.preMin = 1;   // the peak-hold on its own
     p.begin(c);
     // What the C5 really does: steady at -70, with a 3 ms dip to -80 every 25 ms.
     float minOut = 0, maxOut = -200;
@@ -149,8 +149,50 @@ static void test_stall_detect() {
     CHECK(!p.valid());
 }
 
+static void test_premin_drops_bursts() {
+    c5rxtest::suite("premin");
+    RssiPipeline p;
+    RssiPipelineConfig c;
+    c.dbLo = -95; c.dbHi = -35; c.emaAlpha = 1.0f; c.useMedian3 = false;
+    c.settleMs = 0; c.windowMaxMs = 30;
+    p.begin(c);
+    CHECK_EQ(p.config().preMin, 8);   // the default
+    uint32_t t = 0;
+    for (int i = 0; i < 20; ++i) p.onSample(-95, ++t);
+    // Wi-Fi-like bursts: 1 to 3 ms at -60, every 24 ms (as measured on R5).
+    // Without the minimum, the 30 ms peak-hold would hold -60 throughout.
+    uint8_t worst = 0;
+    for (int cycle = 0; cycle < 12; ++cycle) {
+        for (int i = 0; i < 24; ++i) {
+            p.onSample(i < 1 + cycle % 3 ? -60.0f : -95.0f, ++t);
+            if (p.counts() > worst) worst = p.counts();
+        }
+    }
+    CHECK_EQ(worst, 0);
+    // A steady signal (a VTX) comes through 7 ms late...
+    int lag = -1;
+    for (int i = 0; i < 40; ++i) {
+        p.onSample(-50, ++t);
+        if (lag < 0 && p.counts() > 150) lag = i;
+    }
+    CHECK_EQ(lag, 7);
+    // ...and its dips of up to 6 ms (10 dB) are still bridged by the peak-hold.
+    uint8_t lowest = 255;
+    for (int cycle = 0; cycle < 6; ++cycle) {
+        for (int i = 0; i < 40; ++i) {
+            p.onSample(i < 6 ? -60.0f : -50.0f, ++t);
+            if (p.counts() < lowest) lowest = p.counts();
+        }
+    }
+    CHECK_EQ(lowest, p.counts());
+    // The setting is clamped.
+    p.setPreMin(200); CHECK_EQ(p.config().preMin, RssiPipeline::kPreMinCap);
+    p.setPreMin(0);   CHECK_EQ(p.config().preMin, 1);
+}
+
 int main() {
     std::printf("== test_pipeline ==\n");
+    test_premin_drops_bursts();
     test_calibration_map();
     test_smoothing_monotone();
     test_median_rejects_glitch();

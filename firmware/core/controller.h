@@ -51,6 +51,14 @@ public:
     const RfBackend* backend() const { return rf_; }
     RfBackend*       backend()       { return rf_; }
 
+    // Record the next n raw readings (dBm, before the RSSI pipeline), for the
+    // console's `raw` command.
+    static const int kCaptureMax = 2000;
+    void startCapture(int n);
+    bool capturing() const { return capN_ < capLen_; }
+    int  captured() const { return capN_; }
+    const int8_t* captureData() const { return cap_; }
+
 private:
     void retune(uint16_t mhz, uint32_t nowMs);
     void enterFault(uint32_t nowMs);
@@ -65,6 +73,10 @@ private:
     uint16_t tunedMhz_      = 0;
     uint16_t lastSynthReg_  = 0;
     uint32_t faultUntilMs_  = 0;
+
+    int8_t   cap_[kCaptureMax];
+    int      capLen_ = 0;
+    int      capN_   = 0;
 };
 
 } // namespace c5rx

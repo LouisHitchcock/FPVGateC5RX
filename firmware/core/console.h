@@ -77,6 +77,7 @@ private:
     uint16_t sweepLo_ = 0;
     uint16_t sweepHi_ = 0;
     uint16_t sweepStep_ = 0;          // 0 = channel-table scan
+    bool     rawPending_ = false;     // `raw`: print the capture when it's done
 };
 
 } // namespace c5rx

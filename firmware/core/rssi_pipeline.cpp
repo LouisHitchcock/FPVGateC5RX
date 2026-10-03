@@ -23,6 +23,26 @@ void RssiPipeline::reset() {
     haveSample_ = false;
     lastSampleMs_ = 0; blankUntilMs_ = 0;
     winHead_ = 0; winCount_ = 0;
+    pmIdx_ = 0; pmCount_ = 0;
+}
+
+void RssiPipeline::setPreMin(uint8_t n) {
+    if (n < 1) n = 1;
+    if (n > kPreMinCap) n = kPreMinCap;
+    cfg_.preMin = n;
+    pmIdx_ = 0; pmCount_ = 0;
+}
+
+float RssiPipeline::preMin(float db) {
+    int n = cfg_.preMin;
+    if (n <= 1) return db;
+    pm_[pmIdx_] = db;
+    pmIdx_ = (pmIdx_ + 1) % n;
+    if (pmCount_ < n) ++pmCount_;
+    float mn = pm_[0];
+    for (int i = 1; i < pmCount_; ++i)
+        if (pm_[i] < mn) mn = pm_[i];
+    return mn;
 }
 
 float RssiPipeline::windowMax(float db, uint32_t nowMs) {
@@ -77,6 +97,7 @@ void RssiPipeline::onTune(uint32_t nowMs) {
     // forget the old channel's readings.
     medCount_ = 0; medIdx_ = 0;
     winHead_ = 0; winCount_ = 0;
+    pmIdx_ = 0; pmCount_ = 0;
 }
 
 void RssiPipeline::onSample(float db, uint32_t nowMs) {
@@ -84,7 +105,8 @@ void RssiPipeline::onSample(float db, uint32_t nowMs) {
     haveSample_ = true;
     stalled_ = false;
 
-    float held = windowMax(db, nowMs);   // hides the AGC-refresh dips
+    float clean = preMin(db);               // removes short bursts (Wi-Fi)
+    float held = windowMax(clean, nowMs);   // hides the AGC-refresh dips
     float filtered = held;
     if (cfg_.useMedian3) {
         med_[medIdx_] = held;

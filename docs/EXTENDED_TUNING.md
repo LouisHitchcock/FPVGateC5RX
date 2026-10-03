@@ -36,10 +36,18 @@ Started 2026-10-03.
   the busy Wi-Fi channels 153-169 here), background Wi-Fi gave FPVGate
   14-35 on average and peaks of 51-71. R5 (5806) arrives as 5805: the
   RX5808 frequency word only holds every other MHz, the same as a real RX5808.
+- **Background Wi-Fi, fixed.** A 2 s raw capture on R5 (VTX off) showed the
+  bursts as spikes of mostly 1 ms (63 of 66; the rest 2-3 ms) to about
+  -70 dBm, every ~24 ms, over a -97 floor. The 30 ms peak-hold held each one
+  until the next, so the output sat near -70. A VTX capture on R8 showed the
+  opposite: a steady -54 with 6-14 dB dips of 1-6 ms, which is why the
+  peak-hold is needed. The fix is a minimum over the last 8 readings before
+  the peak-hold: it removes upward spikes shorter than 8 ms, and the
+  peak-hold still bridges the (now 7 ms wider) dips. On hardware, R5 with the
+  VTX off went from FPVGate 12 (peaks 23) to 0, and the C5's output from
+  above 0 69% of the time to 0%. R8 with the VTX on: FPVGate 145 against
+  148 before, with a little more ripple (129-157 against 145-151).
 - **Still open:**
-  - Background Wi-Fi on in-band channels (above). The 30 ms peak-hold, added
-    to hide the old reading's dips, now stretches each Wi-Fi burst. Try a
-    shorter or no peak-hold with the live reading, or a higher `cal lo`.
   - The 11p A/B (T3/T4) hasn't run. 11p auto is on from 5750 MHz.
   - Sig mode sees Wi-Fi packets on in-band channels. Check they can't trigger
     false laps.

@@ -141,6 +141,9 @@ void Console::printHelp() {
         "  cal <lo_db> <hi_db>   set the dB levels that read as RSSI 0 and 255\n"
         "  cal lo | cal hi       use the current reading as the low / high end\n"
         "  ema <alpha>           smoothing, 0.01 to 1 (1 = off)\n"
+        "  hold [ms]             peak-hold window (0 = off)\n"
+        "  premin [n]            minimum of n raw readings before the peak-hold (1 = off)\n"
+        "  raw [n]               print the next n raw readings (1 per ms)\n"
         "  knee <db> <ratio>|off soft ceiling: squeeze signals above <db>\n"
         "  boot <mhz>|off        frequency to tune at power-up\n"
         "  save                  store settings to flash\n"
@@ -227,6 +230,22 @@ void Console::scanStep(uint32_t nowMs) {
 }
 
 void Console::tick(uint32_t nowMs) {
+    if (rawPending_ && !ctl_->capturing()) {
+        rawPending_ = false;
+        int n = ctl_->captured();
+        const int8_t* d = ctl_->captureData();
+        outf("raw: %d readings, 1 per ms, dBm\n", n);
+        for (int i = 0; i < n; i += 25) {
+            char line[160];
+            int len = 0;
+            for (int j = i; j < i + 25 && j < n; ++j)
+                len += snprintf(line + len, sizeof(line) - len, "%d ", d[j]);
+            line[len > 0 ? len - 1 : 0] = '\n';
+            line[len > 0 ? len : 1] = '\0';
+            out(line);
+        }
+        out("raw done\n");
+    }
     if (scanActive_) scanStep(nowMs);
     if (streamOn_ && !scanActive_ && (nowMs - lastStreamMs_) >= streamPeriodMs_) {
         lastStreamMs_ = nowMs;
@@ -356,6 +375,22 @@ void Console::execLine(const char* lineIn, uint32_t nowMs) {
         applyCalibration();
         if (cfg_->kneeRatio > 1.0f) outf("knee %.1f dB ratio %.1f (save to keep)\n", cfg_->kneeDb, cfg_->kneeRatio);
         else out("knee off (save to keep)\n");
+    } else if (!strcmp(cmd, "raw")) {
+        int count = (n >= 2) ? atoi(tok[1]) : 1000;
+        if (count < 1 || count > Controller::kCaptureMax) {
+            outf("err: 1 to %d readings\n", Controller::kCaptureMax);
+            return;
+        }
+        ctl_->startCapture(count);
+        rawPending_ = true;
+    } else if (!strcmp(cmd, "hold")) {
+        if (n >= 2) ctl_->pipeline().setWindowMaxMs((uint32_t)atoi(tok[1]));
+        outf("hold %lu ms (peak-hold; 0 = off)\n",
+             (unsigned long)ctl_->pipeline().config().windowMaxMs);
+    } else if (!strcmp(cmd, "premin")) {
+        if (n >= 2) ctl_->pipeline().setPreMin((uint8_t)atoi(tok[1]));
+        outf("premin %u (minimum of that many raw readings; 1 = off)\n",
+             ctl_->pipeline().config().preMin);
     } else if (!strcmp(cmd, "ema")) {
         if (n < 2) { out("usage: ema <alpha 0.01..1>\n"); return; }
         float a = (float)atof(tok[1]);

@@ -103,6 +103,11 @@ void Controller::onHostWord(uint32_t bits25, uint32_t nowMs) {
     }
 }
 
+void Controller::startCapture(int n) {
+    capLen_ = n < 1 ? 1 : n > kCaptureMax ? kCaptureMax : n;
+    capN_ = 0;
+}
+
 void Controller::tick(uint32_t nowMs) {
     if (state_ == State::RF_FAULT) {
         if (nowMs >= faultUntilMs_) {
@@ -124,6 +129,8 @@ void Controller::tick(uint32_t nowMs) {
 
     float db;
     if (rf_ && rf_->readPowerDb(db, nowMs)) {
+        if (capN_ < capLen_)
+            cap_[capN_++] = (int8_t)(db < -128.0f ? -128 : db > 127.0f ? 127 : (int)db);
         pipe_.onSample(db, nowMs);
         if (state_ == State::TUNING && pipe_.valid()) {
             state_ = State::TRACKING;

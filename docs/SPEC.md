@@ -105,18 +105,24 @@ comes back as 5657). The C5 snaps it to the nearest standard channel within
 
 From a reading in dBm to FPVGate's 0 to 255, in `core/rssi_pipeline.*`:
 
-1. **Peak-hold (30 ms):** outputs the highest reading of the last 30 ms, which
-   hides the regular dips. A rise comes through immediately; a fall is delayed
-   by up to 30 ms.
-2. **Median of three:** drops single-reading glitches.
-3. **Smoothing:** off by default. Any smoothing visibly rounded the edges in
+1. **Pre-minimum (8 readings):** the lowest of the last 8 readings (8 ms).
+   This removes any upward burst shorter than 8 ms. On channels inside the
+   Wi-Fi bands, background Wi-Fi shows as spikes of mostly 1 to 3 ms about
+   every 24 ms, and step 2 would otherwise hold them continuously. A rise is
+   delayed by 7 ms. `premin` changes it, 1 = off.
+2. **Peak-hold (30 ms):** outputs the highest value of the last 30 ms. A VTX
+   reading dips by 6 to 14 dB for 1 to 6 ms several times a second (made
+   7 ms wider by step 1); this bridges them. A fall is delayed by up to 30 ms.
+   `hold` changes it, 0 = off.
+3. **Median of three:** drops single-reading glitches.
+4. **Smoothing:** off by default. Any smoothing visibly rounded the edges in
    testing, and FPVGate does its own filtering.
-4. **Soft ceiling (optional):** above a chosen level, extra signal is
+5. **Soft ceiling (optional):** above a chosen level, extra signal is
    compressed, so strong signals bunch together but still peak, rather like an
    RX5808 that saturates.
-5. **Calibration:** `dbLo` reads as 0 and `dbHi` as 255; anything outside is
+6. **Calibration:** `dbLo` reads as 0 and `dbHi` as 255; anything outside is
    clamped. `dbHi` still reads 255 with the soft ceiling on.
-6. **Settling and stalls:** for 35 ms after a retune the output holds its last
+7. **Settling and stalls:** for 35 ms after a retune the output holds its last
    value and is marked invalid, as FPVGate expects from an RX5808. If no new
    reading arrives for 200 ms, it's marked stalled.
 

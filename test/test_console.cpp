@@ -206,6 +206,28 @@ static void test_range_follows_backend() {
     CHECK(has("scan done: peak R8 5917"));
 }
 
+static void test_raw_hold_premin() {
+    c5rxtest::suite("con-raw");
+    Rig r;
+    r.sim.setCarrier(5800, -50);
+    r.cmd("tune 5800");
+    r.run(50);
+    g_out.clear();
+    r.cmd("raw 60");
+    r.run(100);
+    CHECK(has("raw: 60 readings"));
+    CHECK(has("-50 -50 -50"));
+    CHECK(has("raw done"));
+    r.cmd("hold 0");
+    CHECK(has("hold 0 ms"));
+    CHECK_EQ(r.ctl.pipeline().config().windowMaxMs, 0u);
+    r.cmd("premin 6");
+    CHECK(has("premin 6"));
+    CHECK_EQ(r.ctl.pipeline().config().preMin, 6);
+    r.cmd("raw 0");
+    CHECK(has("err: 1 to 2000"));
+}
+
 static void test_rf_without_settings() {
     c5rxtest::suite("con-rf");
     Rig r;
@@ -218,6 +240,7 @@ int main() {
     test_sweep();
     test_range_follows_backend();
     test_rf_without_settings();
+    test_raw_hold_premin();
     test_tune_and_status();
     test_channel_and_errors();
     test_scan_finds_carrier();

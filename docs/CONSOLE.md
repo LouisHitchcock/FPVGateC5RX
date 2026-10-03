@@ -54,6 +54,9 @@ f=5769 R4 st=TRACKING db=-25.5 rssi=214 valid=1
 | `cal <lo> <hi>` | Set the levels, in dBm, that read as 0 and 255 | `cal -80 -15` |
 | `knee <dB> <ratio>` or `knee off` | Soft ceiling. Above `<dB>`, every `<ratio>` dB of extra signal only counts as 1 dB, so strong signals bunch together but still peak. | `knee -55 6` |
 | `ema <alpha>` | Smoothing, from 0.01 to 1. **1 means off, the default.** Lower values smooth more but round off the edges. | `ema 1` |
+| `premin [n]` | Lowest of the last `n` readings, before the peak-hold. Removes Wi-Fi bursts shorter than `n` ms. Default 8; 1 = off. Not saved. | `premin 8` |
+| `hold [ms]` | Peak-hold window, which bridges the VTX's short dips. Default 30; 0 = off. Not saved. | `hold 40` |
+| `raw [n]` | Print the next `n` raw readings (one per ms, dBm, before any filtering), up to 2000 | `raw 2000` |
 | `boot <MHz>` or `boot off` | Frequency to tune at power-up. FPVGate's commands still override it. | `boot 5769` |
 | `save` | Store all of the above | `save` |
 | `defaults` | Go back to the default settings (not stored until you `save`) | `defaults` |

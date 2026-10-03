@@ -26,7 +26,7 @@ static bool checkRange() {
 static bool checkPipeline() {
     RssiPipeline p; RssiPipelineConfig c;
     c.dbLo = -95; c.dbHi = -35; c.emaAlpha = 1.0f; c.useMedian3 = false;
-    c.settleMs = 0; c.windowMaxMs = 0;   // test the mapping on its own
+    c.settleMs = 0; c.windowMaxMs = 0; c.preMin = 1;   // test the mapping on its own
     p.begin(c);
     p.onSample(-95, 1); if (p.counts() != 0) return false;
     p.onSample(-35, 2); if (p.counts() != 255) return false;
