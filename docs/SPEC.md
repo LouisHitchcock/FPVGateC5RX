@@ -77,13 +77,14 @@ comes back as 5657). The C5 snaps it to the nearest standard channel within
   only receives, so it never transmits on them); and promiscuous mode, so the
   receiver runs all the time.
 - **Tuning, two ways (`rf method auto`, the default, picks per frequency):**
-  - *Wi-Fi channel:* where it can, the requested frequency goes to the nearest
-    5 GHz Wi-Fi channel (36-64, 100-144 or 149-177), up to 12 MHz away. That
-    puts the FPV signal inside the receiver's 20 MHz bandwidth. This is how
-    R1-R7, A, B, F and E1-E5 are tuned.
+  - *Wi-Fi channel:* where the requested frequency is within 5 MHz of a 5 GHz
+    Wi-Fi channel (36-64, 100-144 or 149-177), the radio is tuned to that
+    channel. This is how most of R, A, F and E1-E5 are tuned.
   - *Direct PHY:* inside Espressif's PHY library a 5 GHz "channel" is just the
     frequency in MHz, so `RFChannelSel(mhz, 0)` tunes any frequency. Anything
-    the Wi-Fi driver can't reach (R8, E6-E8, L1-L4) is tuned this way: the
+    the Wi-Fi driver can't reach (R8, E6-E8, L1-L4), or would leave more than
+    5 MHz off-centre (R3 and B1 are 12 MHz off, B2 and B3 6-7), is tuned this
+    way. At 12 MHz off, R3 read -74 dBm against -49 tuned exactly. The
     driver is put on the nearest Wi-Fi channel first, then the radio is moved
     onto the exact frequency, then one calibration pass
     (`phy_param_track_tot`) runs. The PHY's own copy of the frequency is

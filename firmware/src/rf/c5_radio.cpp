@@ -131,10 +131,20 @@ bool C5RadioBackend::canTune(uint16_t mhz) const {
     return phyCanTune(mhz);
 }
 
-// Auto keeps the Wi-Fi method wherever it works, and only uses the phy
-// method for frequencies the driver can't reach (R8, E6-E8, the L band).
+// Auto keeps the Wi-Fi method where the carrier lands near the centre of a
+// Wi-Fi channel, and uses the phy method for frequencies the driver can't
+// reach (R8, E6-E8, the L band) and for those more than kAutoMaxOffsetMhz
+// off-centre. R3 (5732) is 12 MHz from channel 144 and read clearly weaker
+// than R1 on the bench; B1-B3 are 6 to 12 MHz off. Every channel within
+// 5 MHz read normally.
+static const int kAutoMaxOffsetMhz = 5;
+
 bool C5RadioBackend::usePhy(uint16_t mhz) const {
-    if (method_ == Method::AUTO) return !wifiCanTune(mhz);
+    if (method_ == Method::AUTO) {
+        if (!wifiCanTune(mhz)) return true;
+        int off = planTuning(mhz).offsetMhz;
+        return off > kAutoMaxOffsetMhz || off < -kAutoMaxOffsetMhz;
+    }
     return method_ == Method::PHY;
 }
 

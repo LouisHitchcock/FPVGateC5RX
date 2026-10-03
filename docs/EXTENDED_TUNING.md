@@ -5,10 +5,14 @@ Started 2026-10-03.
 
 ## Bench results, 2026-10-03 (C5-Zero, VTX at about 1 m)
 
-- **The default is now `rf method auto`.** It uses the Wi-Fi method wherever
-  that works, and the phy method (`RFChannelSel` + `post track`) only for
-  frequencies the driver can't reach. FPVGate tunes R8 over SPI with no
-  console needed.
+- **The default is now `rf method auto`.** It uses the Wi-Fi method where
+  the channel is within 5 MHz of a Wi-Fi channel, and the phy method
+  (`RFChannelSel` + `post track`) for frequencies the driver can't reach or
+  would leave further off-centre. FPVGate tunes R8 over SPI with no console
+  needed. (Louis's validation on all channels found R3 weak: with the Wi-Fi
+  method it's 12 MHz from channel 144 and read -74 dBm, swinging 0-144 in
+  output, against -49 dBm and a steady 156-181 tuned exactly. R3, B1, B2 and
+  B3 now use the phy method.)
 - **Nothing retunes the radio behind us.** The PHY stays on the frequency we
   set (`phy_param` + 288 watched every reading, zero drifts).
 - **The real problem was the RSSI reading, not the tuning.**
