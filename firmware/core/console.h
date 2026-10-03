@@ -47,6 +47,9 @@ private:
     void startScan(uint32_t dwellMs, uint32_t nowMs);
     void scanStep(uint32_t nowMs);
     void applyCalibration();
+    bool     tunable(uint16_t mhz) const;
+    uint16_t scanMhzAt(int i) const;
+    int      nextScanIndex(int from) const;
 
     Controller*    ctl_ = nullptr;
     PersistConfig* cfg_ = nullptr;
@@ -70,6 +73,10 @@ private:
     uint16_t scanRestoreMhz_ = 0;
     uint16_t peakMhz_ = 0;
     float    peakDb_ = -200.0f;
+    // sweep: a scan over a frequency range instead of the channel table
+    uint16_t sweepLo_ = 0;
+    uint16_t sweepHi_ = 0;
+    uint16_t sweepStep_ = 0;          // 0 = channel-table scan
 };
 
 } // namespace c5rx

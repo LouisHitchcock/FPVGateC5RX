@@ -173,8 +173,9 @@ scale. Do it once for each setup, in the console:
 2. With the VTX **on** and held at gate-pass distance: `cal hi`
 3. `save`
 
-You can also set the levels directly, for example `cal -80 -15` (the dBm values
-for 0 and for 255). Setting the top a few dB above your gate-pass level leaves
+You can also set the levels directly, for example `cal -92 -30` (the dBm values
+for 0 and for 255). On the bench the floor with the VTX off is about -94, and
+a VTX at 1 m about -48. Setting the top a few dB above your gate-pass level leaves
 room for close passes.
 
 **Optional soft ceiling:** `knee -55 6` makes strong signals bunch together,
@@ -193,15 +194,15 @@ removes it. Then `save`.
 | Band | Works? |
 |---|---|
 | Raceband R1-R7 | Yes |
-| Raceband R8 (5917 MHz) | No, it's outside the C5's range |
+| Raceband R8 (5917 MHz) | Yes, tested end to end with FPVGate |
 | Bands A, B and F | Yes, all channels |
 | Band E, E1-E5 | Yes |
-| Band E, E6-E8 (5905, 5925, 5945 MHz) | No, outside the C5's range |
-| Band L, L5-L8 | Should work, untested |
-| Band L, L1-L4 | No, there's no Wi-Fi channel close enough |
+| Band E, E6-E8 (5905, 5925, 5945 MHz) | Should work, untested |
+| Band L, L1-L8 | Should work, untested |
 
-On a channel it can't receive, the C5 accepts FPVGate's command but reports no
-signal.
+R8, E6-E8 and L1-L4 are outside the Wi-Fi channels, so the C5 tunes them
+directly in the radio instead (see [EXTENDED_TUNING.md](EXTENDED_TUNING.md)).
+Nothing above about 5960 MHz is usable.
 
 ## 12. Troubleshooting
 
@@ -214,6 +215,7 @@ signal.
 | The C5 doesn't follow FPVGate's channel | Bus wiring | Type `bus`. `frames=0` means nothing is arriving. Idle should show `SEL=...(1) CLK=...(0)`; if they're the other way round, SEL and CLK are swapped. |
 | RSSI is stuck at 255 | The top of the calibration is too low | Raise it with `cal <lo> <hi>` |
 | The background jumps about with the VTX off | Wi-Fi or other 5 GHz traffic on that channel | With the VTX off, type `cal lo` to raise the bottom of the scale |
+| FPVGate shows one channel but the RSSI ignores the VTX | The C5 restarted and went back to its boot frequency. FPVGate only sends a channel when it changes, so it doesn't know. | `s` shows the C5's frequency. In FPVGate, select another channel and then yours again. |
 | The RSSI rises in two steps when the VTX powers up | The VTX starts at low power, then switches to full power | That's the VTX, not the C5. `knee -55 6` makes it less visible. |
 
 ## 13. Updating

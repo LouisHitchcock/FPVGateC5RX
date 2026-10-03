@@ -59,22 +59,36 @@ void channelLabel(uint16_t mhz, char out[4]) {
     else   { out[0] = '-'; out[1] = '-'; out[2] = 0; }
 }
 
-// Scan order: every in-range channel in the table, skipping repeated MHz.
-bool isScanEntry(int i) {
-    int n; const FpvChannel* tbl = fpvChannelTable(n);
-    if (i < 0 || i >= n || !c5InRange(tbl[i].mhz)) return false;
-    for (int j = 0; j < i; ++j)
-        if (tbl[j].mhz == tbl[i].mhz) return false;
-    return true;
-}
-
-int nextScanIndex(int from) {
-    int n; fpvChannelTable(n);
-    for (int i = from; i < n; ++i) if (isScanEntry(i)) return i;
-    return -1;
-}
-
 } // namespace
+
+bool Console::tunable(uint16_t mhz) const {
+    const RfBackend* rf = ctl_->backend();
+    return rf ? rf->canTune(mhz) : c5InRange(mhz);
+}
+
+// Step `i` of a scan or sweep, in MHz, or 0 once past the end. A scan is
+// every channel in the table, a sweep every `step` MHz from lo to hi.
+uint16_t Console::scanMhzAt(int i) const {
+    if (sweepStep_) {
+        uint32_t mhz = (uint32_t)sweepLo_ + (uint32_t)i * sweepStep_;
+        return mhz <= sweepHi_ ? (uint16_t)mhz : 0;
+    }
+    int n; const FpvChannel* tbl = fpvChannelTable(n);
+    return (i >= 0 && i < n) ? tbl[i].mhz : 0;
+}
+
+// The next step from `from` on that can be tuned, skipping channels that
+// repeat an earlier frequency. -1 at the end.
+int Console::nextScanIndex(int from) const {
+    for (int i = from; ; ++i) {
+        uint16_t mhz = scanMhzAt(i);
+        if (!mhz) return -1;
+        if (!tunable(mhz)) continue;
+        bool repeat = false;
+        for (int j = 0; j < i && !sweepStep_; ++j) repeat = repeat || scanMhzAt(j) == mhz;
+        if (!repeat) return i;
+    }
+}
 
 void Console::begin(Controller* ctl, PersistConfig* cfg, const ConsoleHooks& hooks) {
     ctl_ = ctl;
@@ -117,9 +131,11 @@ void Console::feedChar(char c, uint32_t nowMs) {
 void Console::printHelp() {
     out("commands:\n"
         "  status | s            one status line\n"
-        "  tune <mhz> | f <mhz>  tune to a frequency (5180-5885)\n"
+        "  tune <mhz> | f <mhz>  tune to a frequency (5180-5885, wider with rf method phy)\n"
         "  ch <band><n>          tune to a channel, e.g. ch R1, ch F4\n"
         "  scan [dwell_ms]       measure every channel and report the strongest\n"
+        "  sweep <lo> <hi> <step> [dwell_ms]  measure every <step> MHz from lo to hi\n"
+        "  rf [...]              radio settings (rf help)\n"
         "  stream on|off [hz]    print status continuously (default 5 Hz)\n"
         "  cal                   show calibration\n"
         "  cal <lo_db> <hi_db>   set the dB levels that read as RSSI 0 and 255\n"
@@ -150,8 +166,8 @@ void Console::applyCalibration() {
 }
 
 void Console::tune(uint16_t mhz, uint32_t nowMs) {
-    if (!c5InRange(mhz)) {
-        outf("err: %u MHz is outside the C5 range (%u-%u)\n", mhz, kC5MinMhz, kC5MaxMhz);
+    if (!tunable(mhz)) {
+        outf("err: %u MHz is outside the C5 range for the current radio settings\n", mhz);
         return;
     }
     ctl_->tuneMhz(mhz, nowMs);
@@ -167,9 +183,8 @@ void Console::startScan(uint32_t dwellMs, uint32_t nowMs) {
     peakMhz_ = 0;
     peakDb_ = -200.0f;
     scanActive_ = true;
-    out("scan: channel  MHz   peak dB\n");
-    int n; const FpvChannel* tbl = fpvChannelTable(n);
-    ctl_->tuneMhz(tbl[scanIdx_].mhz, nowMs);
+    out(sweepStep_ ? "sweep: MHz   peak dB\n" : "scan: channel  MHz   peak dB\n");
+    ctl_->tuneMhz(scanMhzAt(scanIdx_), nowMs);
     scanPhaseStartMs_ = nowMs;
     scanSawValid_ = false;
     scanMaxDb_ = -200.0f;
@@ -184,25 +199,28 @@ void Console::scanStep(uint32_t nowMs) {
     uint32_t settle = ctl_->pipeline().config().settleMs;
     if (nowMs - scanPhaseStartMs_ < settle + scanDwellMs_) return;
 
-    int n; const FpvChannel* tbl = fpvChannelTable(n);
-    const FpvChannel& ch = tbl[scanIdx_];
-    if (scanSawValid_) {
-        outf("scan: %c%u       %u  %6.1f\n", ch.band, ch.index, ch.mhz, scanMaxDb_);
-        if (scanMaxDb_ > peakDb_) { peakDb_ = scanMaxDb_; peakMhz_ = ch.mhz; }
+    uint16_t mhz = scanMhzAt(scanIdx_);
+    if (sweepStep_) {
+        if (scanSawValid_) outf("sweep: %u  %6.1f\n", mhz, scanMaxDb_);
+        else outf("sweep: %u  no reading\n", mhz);
     } else {
-        outf("scan: %c%u       %u  no reading\n", ch.band, ch.index, ch.mhz);
+        int n; const FpvChannel& ch = fpvChannelTable(n)[scanIdx_];
+        if (scanSawValid_) outf("scan: %c%u       %u  %6.1f\n", ch.band, ch.index, mhz, scanMaxDb_);
+        else outf("scan: %c%u       %u  no reading\n", ch.band, ch.index, mhz);
     }
+    if (scanSawValid_ && scanMaxDb_ > peakDb_) { peakDb_ = scanMaxDb_; peakMhz_ = mhz; }
 
     scanIdx_ = nextScanIndex(scanIdx_ + 1);
     if (scanIdx_ < 0) {
         scanActive_ = false;
+        const char* what = sweepStep_ ? "sweep" : "scan";
         char lab[4]; channelLabel(peakMhz_, lab);
-        if (peakMhz_) outf("scan done: peak %s %u MHz at %.1f dB\n", lab, peakMhz_, peakDb_);
-        else out("scan done: no readings\n");
+        if (peakMhz_) outf("%s done: peak %s %u MHz at %.1f dB\n", what, lab, peakMhz_, peakDb_);
+        else outf("%s done: no readings\n", what);
         if (scanRestoreMhz_) ctl_->tuneMhz(scanRestoreMhz_, nowMs);
         return;
     }
-    ctl_->tuneMhz(tbl[scanIdx_].mhz, nowMs);
+    ctl_->tuneMhz(scanMhzAt(scanIdx_), nowMs);
     scanPhaseStartMs_ = nowMs;
     scanSawValid_ = false;
     scanMaxDb_ = -200.0f;
@@ -220,13 +238,13 @@ void Console::execLine(const char* lineIn, uint32_t nowMs) {
     char buf[80];
     strncpy(buf, lineIn, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
-    char* tok[4];
-    int n = tokenize(buf, tok, 4);
+    char* tok[6];
+    int n = tokenize(buf, tok, 6);
     if (n == 0) return;
     lower(tok[0]);
     const char* cmd = tok[0];
 
-    if (scanActive_ && strcmp(cmd, "scan") != 0) {
+    if (scanActive_ && strcmp(cmd, "scan") != 0 && strcmp(cmd, "sweep") != 0) {
         scanActive_ = false;                     // any other command stops a scan
         out("scan aborted\n");
         if (scanRestoreMhz_) ctl_->tuneMhz(scanRestoreMhz_, nowMs);
@@ -248,7 +266,31 @@ void Console::execLine(const char* lineIn, uint32_t nowMs) {
         uint32_t dwell = (n >= 2) ? (uint32_t)atoi(tok[1]) : 60;
         if (dwell < 5) dwell = 5;
         if (dwell > 2000) dwell = 2000;
+        sweepStep_ = 0;
         startScan(dwell, nowMs);
+    } else if (!strcmp(cmd, "sweep")) {
+        if (n < 4) { out("usage: sweep <lo_mhz> <hi_mhz> <step_mhz> [dwell_ms]\n"); return; }
+        int lo = atoi(tok[1]), hi = atoi(tok[2]), step = atoi(tok[3]);
+        if (lo < 1 || hi < lo || hi > 65535 || step < 1 || step > 1000) {
+            out("err: need 0 < lo <= hi and a step of 1 to 1000 MHz\n");
+            return;
+        }
+        uint32_t dwell = (n >= 5) ? (uint32_t)atoi(tok[4]) : 60;
+        if (dwell < 5) dwell = 5;
+        if (dwell > 2000) dwell = 2000;
+        sweepLo_ = (uint16_t)lo; sweepHi_ = (uint16_t)hi; sweepStep_ = (uint16_t)step;
+        startScan(dwell, nowMs);
+    } else if (!strcmp(cmd, "rf")) {
+        char reply[400];
+        reply[0] = '\0';
+        RfBackend* rf = ctl_->backend();
+        if (!rf || !rf->command(tok + 1, n - 1, reply, sizeof(reply))) {
+            out("err: this radio has no rf settings\n");
+            return;
+        }
+        out(reply);
+        // A setting may change what the radio can tune, so tune again.
+        if (ctl_->currentMhz()) ctl_->tuneMhz(ctl_->currentMhz(), nowMs);
     } else if (!strcmp(cmd, "stream")) {
         if (n < 2) { out("usage: stream on|off [hz]\n"); return; }
         lower(tok[1]);

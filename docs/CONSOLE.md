@@ -18,8 +18,17 @@ python tools\c5cmd.py COM29 "ch R4" "s"        # scripted, and doesn't reset the
 |---|---|---|
 | `s` or `status` | One status line (see below) | `s` |
 | `ch <band><n>` | Tune to a channel | `ch R4`, `ch F2` |
-| `tune <MHz>` or `f <MHz>` | Tune to a frequency, 5180 to 5885 | `tune 5800` |
+| `tune <MHz>` or `f <MHz>` | Tune to a frequency, 4900 to 6000 (5180 to 5885 with `rf method wifi`). Nothing above about 5960 is usable. | `tune 5800` |
 | `scan [ms]` | Measure every channel the C5 can receive, print each, then name the strongest. `ms` is the time per channel (default 60). Any other command stops it. | `scan`, `scan 100` |
+| `sweep <lo> <hi> <step> [ms]` | Like `scan`, but every `step` MHz from `lo` to `hi`. Frequencies the radio can't tune are skipped. | `sweep 5870 5960 2 100` |
+| `rf` | Radio settings, for experiments. Not saved: every boot starts with the defaults shown in brackets. See EXTENDED_TUNING.md. | `rf` |
+| `rf method auto\|wifi\|phy` | How to tune: Wi-Fi channel where possible, else direct (auto); Wi-Fi channel only; always direct | `rf method phy` |
+| `rf 11p auto\|on\|off [0\|1]` | 802.11p mode (auto: on from 5750 MHz) | `rf 11p off` |
+| `rf read sig\|rssi\|nf` | What the RSSI is made from: the live signal-RSSI register (sig), the old `phy_get_rssi` that freezes when nothing is detected (rssi), or the noise-floor estimate (nf) | `rf read sig` |
+| `rf sigen 0\|1` | Signal-RSSI mode on (1, set at boot) or off | `rf sigen 1` |
+| `rf post none\|twice\|track` | What runs after a direct tune (track) | `rf post track` |
+| `rf hold on\|off` | Put the radio back if anything moves it (off) | `rf hold on` |
+| `rf anchor auto\|<channel>` | Which Wi-Fi channel the driver sits on during a direct tune (auto: nearest) | `rf anchor 177` |
 | `stream on [hz]` or `stream off` | Print the status line continuously (default 5 times a second, up to 50) | `stream on 10` |
 
 The status line looks like this:

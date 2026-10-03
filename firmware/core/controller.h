@@ -47,8 +47,9 @@ public:
 
     // For calibration and saved settings.
     RssiPipeline& pipeline() { return pipe_; }
-    // For the console's diag command.
+    // For the console's diag and rf commands.
     const RfBackend* backend() const { return rf_; }
+    RfBackend*       backend()       { return rf_; }
 
 private:
     void retune(uint16_t mhz, uint32_t nowMs);

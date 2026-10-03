@@ -152,8 +152,72 @@ static void test_cal_boot_save() {
     CHECK_NEAR(r.cfg.dbLo, -90, 1e-6);
 }
 
+static void test_sweep() {
+    c5rxtest::suite("con-sweep");
+    Rig r;
+    r.sim.setCarrier(5800, -45);
+    r.cmd("tune 5658");
+    r.run(50);
+    r.cmd("sweep 5780 5820 5 20");
+    CHECK(r.con.scanning());
+    r.run(5000);
+    CHECK(!r.con.scanning());
+    CHECK(has("sweep: 5780"));
+    CHECK(has("sweep: 5820"));
+    CHECK(has("sweep done: peak F4 5800"));
+    CHECK_EQ(r.con.lastScanPeakMhz(), 5800);
+    CHECK_EQ(r.ctl.currentMhz(), 5658);    // restored after sweep
+
+    // Frequencies the radio can't tune are skipped.
+    g_out.clear();
+    r.cmd("sweep 5870 5930 10 20");
+    r.run(5000);
+    CHECK(has("sweep: 5880"));
+    CHECK(!has("sweep: 5890"));
+
+    // A scan after a sweep goes back to the channel table.
+    g_out.clear();
+    r.cmd("scan 20");
+    r.run(10000);
+    CHECK(has("scan: R1"));
+
+    g_out.clear();
+    r.cmd("sweep 5900 5800 5");
+    CHECK(has("err:"));
+    r.cmd("sweep 5800");
+    CHECK(has("usage: sweep"));
+}
+
+static void test_range_follows_backend() {
+    c5rxtest::suite("con-range");
+    Rig r;
+    r.sim.setRange(4900, 6000);            // a radio that reaches R8
+    r.sim.setCarrier(5917, -42);
+    r.cmd("ch R8");
+    CHECK(has("tuned 5917 MHz (R8)"));
+    CHECK(r.ctl.freqSupported());
+    r.run(50);
+    CHECK(r.ctl.rssiValid());
+    CHECK_NEAR(r.ctl.rssiDb(), -42, 0.5);
+    g_out.clear();
+    r.cmd("scan 20");
+    r.run(10000);
+    CHECK(has("scan: R8"));
+    CHECK(has("scan done: peak R8 5917"));
+}
+
+static void test_rf_without_settings() {
+    c5rxtest::suite("con-rf");
+    Rig r;
+    r.cmd("rf");
+    CHECK(has("no rf settings"));
+}
+
 int main() {
     std::printf("== test_console ==\n");
+    test_sweep();
+    test_range_follows_backend();
+    test_rf_without_settings();
     test_tune_and_status();
     test_channel_and_errors();
     test_scan_finds_carrier();

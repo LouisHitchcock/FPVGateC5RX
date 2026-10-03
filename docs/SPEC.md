@@ -76,16 +76,30 @@ comes back as 5657). The C5 snaps it to the nearest standard channel within
   only; a country setting that allows every 5 GHz channel the C5 supports (it
   only receives, so it never transmits on them); and promiscuous mode, so the
   receiver runs all the time.
-- **Tuning:** the requested frequency goes to the nearest 5 GHz Wi-Fi channel
-  (36-64, 100-144 or 149-177), up to 12 MHz away. That puts the FPV signal
-  inside the receiver's 20 MHz bandwidth. Channels with no Wi-Fi channel close
-  enough (R8, E6-E8, L1-L4) are reported as unsupported: no signal, but no
-  error.
-- **Reading the signal:** Espressif's `phy_get_rssi()` gives the noise floor
-  plus the gain the AGC chose, in dBm. With the AGC on automatic it follows an
-  analog FPV signal. It updates about every 25 ms, and each update shows a 2 to
-  3 ms dip of about 10 dB, which the pipeline's peak-hold removes. The firmware
-  reads it every millisecond.
+- **Tuning, two ways (`rf method auto`, the default, picks per frequency):**
+  - *Wi-Fi channel:* where it can, the requested frequency goes to the nearest
+    5 GHz Wi-Fi channel (36-64, 100-144 or 149-177), up to 12 MHz away. That
+    puts the FPV signal inside the receiver's 20 MHz bandwidth. This is how
+    R1-R7, A, B, F and E1-E5 are tuned.
+  - *Direct PHY:* inside Espressif's PHY library a 5 GHz "channel" is just the
+    frequency in MHz, so `RFChannelSel(mhz, 0)` tunes any frequency. Anything
+    the Wi-Fi driver can't reach (R8, E6-E8, L1-L4) is tuned this way: the
+    driver is put on the nearest Wi-Fi channel first, then the radio is moved
+    onto the exact frequency, then one calibration pass
+    (`phy_param_track_tot`) runs. The PHY's own copy of the frequency is
+    checked on every reading, to catch anything moving it back.
+  - Useful up to about 5960 MHz; above that the reading falls away.
+- **802.11p mode** (`phy_11p_set`) is on from 5750 MHz. It came from a public
+  tip and hasn't been A/B tested here yet.
+- **Reading the signal:** at start-up the firmware switches the PHY into
+  signal-RSSI mode (`phy_check_sigrssi_en(1)`) and then reads
+  `phy_get_sigrssi()`, in dBm. This measures all the time. The older
+  `phy_get_rssi()` (noise floor plus an AGC gain byte) only updates when the
+  receiver detects something, so with nothing to detect it freezes at its last
+  value. Background Wi-Fi hid that on in-band channels; at R8 it left the RSSI
+  stuck high after the VTX went off. Bench, R8 at 1 m: about -48 dBm with the
+  VTX on, -94 off. On channels with Wi-Fi traffic, packets show as short
+  spikes (to about -72). The firmware reads it every millisecond.
 
 ## The RSSI pipeline
 

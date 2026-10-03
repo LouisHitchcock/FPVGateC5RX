@@ -43,8 +43,9 @@ more ESP32-C5 boards.
   saturating RX5808.
 - **Serial console:** scan channels, watch the signal live, calibrate and save,
   over USB with no FPVGate needed.
-- **Channels:** Raceband R1-R7, bands A, B and F, and E1-E5. R8 and E6-E8 are
-  outside the C5's range.
+- **Channels:** all of Raceband (R8 included), bands A, B and F, and E1-E5.
+  Channels outside the Wi-Fi bands (R8, E6-E8, L) are tuned directly in the
+  radio; see [Extended tuning](docs/EXTENDED_TUNING.md).
 
 ## Quick start
 
@@ -65,6 +66,7 @@ radio over USB, wire it to FPVGate and calibrate it.
 | [Console](docs/CONSOLE.md) | Every serial console command |
 | [Hardware](docs/HARDWARE.md) | Wiring, and why each resistor and capacitor is needed |
 | [How it works](docs/SPEC.md) | The design: the bus, the radio, the RSSI pipeline |
+| [Extended tuning](docs/EXTENDED_TUNING.md) | R8 and other channels outside the Wi-Fi bands, the live signal-RSSI reading, and the bench results |
 | [Licensing](docs/LICENSING.md) | The licence, commercial licensing, and why it isn't GPL |
 | [Provenance](docs/PROVENANCE.md) | Where each technical fact came from |
 

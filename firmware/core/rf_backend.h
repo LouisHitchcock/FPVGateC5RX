@@ -7,6 +7,7 @@
 #define C5RX_RF_BACKEND_H
 
 #include <stdint.h>
+#include "c5rx_types.h"
 
 namespace c5rx {
 
@@ -22,11 +23,18 @@ public:
     virtual void powerDown() = 0;
     virtual void wake() = 0;
     virtual const char* name() const = 0;
-    // False if `mhz` can never be tuned. The controller then reports "no
-    // signal" for that channel instead of treating it as a fault.
-    virtual bool canTune(uint16_t mhz) const { (void)mhz; return true; }
+    // False if `mhz` can't be tuned. The controller then reports "no signal"
+    // for that channel instead of treating it as a fault. The backend is the
+    // only judge of this: a radio's range can depend on its settings.
+    virtual bool canTune(uint16_t mhz) const { return mhz >= kC5MinMhz && mhz <= kC5MaxMhz; }
     // Status text for the console `diag` command.
     virtual void diag(char* out, int len) const { if (len > 0) out[0] = '\0'; }
+    // The console's `rf ...` commands, for radio-specific settings. `tok` has
+    // the words after `rf`. Returns false if the radio has no such settings;
+    // otherwise writes a reply to `out`.
+    virtual bool command(char* const* tok, int n, char* out, int len) {
+        (void)tok; (void)n; (void)out; (void)len; return false;
+    }
 };
 
 // A simulated radio for the unit tests: a noise floor plus one transmitter

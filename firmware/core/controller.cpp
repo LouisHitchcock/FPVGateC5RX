@@ -24,7 +24,7 @@ void Controller::begin(RfBackend* rf, const ControllerConfig& cfg) {
 
 void Controller::retune(uint16_t mhz, uint32_t nowMs) {
     tunedMhz_ = mhz;
-    freqSupported_ = c5InRange(mhz) && rf_ && rf_->canTune(mhz);
+    freqSupported_ = rf_ && rf_->canTune(mhz);
     if (!powered_) { rf_->wake(); powered_ = true; }
 
     if (!freqSupported_) {
@@ -46,7 +46,7 @@ void Controller::tuneMhz(uint16_t mhz, uint32_t nowMs) {
     lastSynthReg_ = mhzToSynthReg(mhz);
     if (state_ == State::RF_FAULT) {
         tunedMhz_ = mhz;               // tick() applies it when the radio recovers
-        freqSupported_ = c5InRange(mhz);
+        freqSupported_ = rf_ ? rf_->canTune(mhz) : c5InRange(mhz);
         return;
     }
     retune(mhz, nowMs);
