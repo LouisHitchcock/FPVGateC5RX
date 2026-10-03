@@ -39,6 +39,12 @@ PLAN = [
 ]
 
 
+def near(c5_mhz, mhz):
+    # The RX5808 frequency word only holds every other MHz, so FPVGate's 5806
+    # (R5) reaches the C5 as 5805 (A4). A real RX5808 rounds the same way.
+    return c5_mhz is not None and abs(c5_mhz - mhz) <= 2
+
+
 class C5:
     def __init__(self, port):
         self.s = serial.Serial()
@@ -145,7 +151,7 @@ def summarise(rows, high):
         dbs = [r["db"] for r in rs if "db" in r]
         fg = [v for r in rs for v in r["fpv"]]
         flags = []
-        if any(r.get("c5_mhz") != mhz for r in rs[1:]):
+        if any(not near(r.get("c5_mhz"), mhz) for r in rs[1:]):
             flags.append("C5-OFF-CHANNEL")
         if any(r.get("by") == "phy" and r.get("phy_mhz") not in (None, r.get("c5_mhz"))
                for r in rs):
@@ -216,7 +222,7 @@ def main():
                 time.sleep(1.5)
                 after = c5.sample()
                 spi = "SPI tune seen" if (writes is not None and after.get("writes", 0) > writes
-                                          and after.get("c5_mhz") == mhz) else "SPI TUNE NOT SEEN"
+                                          and near(after.get("c5_mhz"), mhz)) else "SPI TUNE NOT SEEN"
                 print("\n[%5.0f s] %s %d MHz  (%s, tuned by %s)" % (
                     t_step - t_run, label, mhz, spi, after.get("by", "?")), flush=True)
                 t_last = t_step
@@ -238,7 +244,7 @@ def main():
                     f.write(",".join(line) + "\n")
                     f.flush()
                     warn = ""
-                    if s.get("c5_mhz") != mhz:
+                    if not near(s.get("c5_mhz"), mhz):
                         warn += "  <-- C5 on %s" % s.get("c5_mhz")
                     if vals and max(vals) > args.high:
                         warn += "  <-- FPVGate %d" % max(vals)

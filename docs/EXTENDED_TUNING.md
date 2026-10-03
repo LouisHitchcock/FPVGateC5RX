@@ -27,7 +27,19 @@ Started 2026-10-03.
   45 dB above the floor. Above about 5960 MHz the reading falls to about -122.
 - **R4 hops settle instantly** with either method, and with the driver parked
   on channel 177 or 36. Distance between driver and radio doesn't matter.
+- **Flight-day run (`tools/flightday.py`, 2026-10-03), VTX off.** FPVGate stepped
+  R1, R2, R3, F2, R4, R5, F5, R6, A1, R7, E6, R8, about 10 minutes each
+  (1 h 57 m). Every change reached the C5 over SPI with the right method (phy
+  for E6 and R8). No creep: quiet channels stayed at -94 to -97 dBm with
+  FPVGate at 0 for the whole step. No C5 restarts, no sigma-delta clock
+  repairs after boot, chip at 43-46 C. On 5760-5843 MHz (F2, R4, R5, F5, R6,
+  the busy Wi-Fi channels 153-169 here), background Wi-Fi gave FPVGate
+  14-35 on average and peaks of 51-71. R5 (5806) arrives as 5805: the
+  RX5808 frequency word only holds every other MHz, the same as a real RX5808.
 - **Still open:**
+  - Background Wi-Fi on in-band channels (above). The 30 ms peak-hold, added
+    to hide the old reading's dips, now stretches each Wi-Fi burst. Try a
+    shorter or no peak-hold with the live reading, or a higher `cal lo`.
   - The 11p A/B (T3/T4) hasn't run. 11p auto is on from 5750 MHz.
   - Sig mode sees Wi-Fi packets on in-band channels. Check they can't trigger
     false laps.
